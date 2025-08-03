@@ -76,7 +76,7 @@ app.get("/api/room/info/:roomCode", async (req, res) => {
 
 // Start the game
 app.post("/api/room/start", async (req, res) => {
-    const {roomCode} = req.body;
+    const { roomCode } = req.body;
     let room = await Room.findOne({ roomCode });
     if (!room) return res.status(400).json({ message: "Room not found" });
     room.gameStarted = true;
@@ -89,38 +89,102 @@ app.post("/api/room/start", async (req, res) => {
 app.post("/api/room/submit", async (req, res) => {
     const { roomCode, username, guess } = req.body;
     let room = await Room.findOne({ roomCode });
-    if (!room) return;
+    if (!room) {
+        return res.status(400).json({ message: "Room not found or full" });
+    }
     let player = room.players.find((p) => p.username === username);
     if (player) {
         player.guess = guess;
-        //console.log("i am called")
         await room.save();
     }
 
+
+    // if (room.players.every((p) => p.guess !== null)) {
+    //     // Set multiplier based on current round (1 to 5)
+    //     const multipliers = [0.9, 0.8, 0.7, 0.6, 0.5];
+    //     const currentRoundIndex = room.currentRound < 5 ? room.currentRound : 4; // prevent overflow
+    //     const multiplier = multipliers[currentRoundIndex];
+
+    //     // Calculate average
+    //     let avg = room.players.reduce((sum, p) => sum + p.guess, 0) / room.players.length;
+
+    //     // Apply round-specific multiplier
+    //     let target = avg * multiplier;
+
+    //     // Determine closest guess
+    //     let winner = room.players.reduce((prev, curr) =>
+    //         Math.abs(curr.guess - target) < Math.abs(prev.guess - target) ? curr : prev
+    //     );
+
+    //     // Update scores and state
+    //     winner.score += 1;
+    //     room.players.forEach((p) => {
+    //         if (p.username !== winner.username) p.score -= 1;
+    //         p.guess = null; // reset guess for next round
+    //     });
+
+    //     room.roundWinner = winner.username;
+    //     room.roundAverage = target.toFixed(2);
+    //     room.currentRound++;
+
+    //     await room.save();
+
+    //     // Emit result to all players in room
+    //     io.to(roomCode).emit("round_result", {
+    //         winner: winner.username,
+    //         average: roundAverage
+    //     });
+    // }
+
+    // return res.status(200).json({ message: "Guess submitted successfully" });
     if (room.players.every((p) => p.guess !== null)) {
-        let avg =
-            room.players.reduce((sum, p) => sum + p.guess, 0) /
-            room.players.length;
-        let target = avg * 0.8;
-        let winner = room.players.reduce((prev, curr) =>
-            Math.abs(curr.guess - target) < Math.abs(prev.guess - target) ? curr : prev
-        );
+        const multipliers = [0.9, 0.8, 0.7, 0.6, 0.5];
+        const currentRoundIndex = room.currentRound < 5 ? room.currentRound : 4;
+        const multiplier = multipliers[currentRoundIndex];
+
+        const avg = room.players.reduce((sum, p) => sum + p.guess, 0) / room.players.length;
+        const target = Math.round((avg * multiplier) * 100) / 100;
+
+        // Find the closest guess (tie-breaker: first occurrence wins)
+        let winner = room.players[0];
+        let smallestDiff = Math.abs(winner.guess - target);
+
+        for (let i = 1; i < room.players.length; i++) {
+            const diff = Math.abs(room.players[i].guess - target);
+            if (diff < smallestDiff) {
+                winner = room.players[i];
+                smallestDiff = diff;
+            }
+        }
+
+        // Update scores
         winner.score += 1;
-        room.players.forEach((p) => {
-            if (p.username !== winner.username) p.score -= 1;
+        room.players.forEach(p => {
+            if (p.username !== winner.username) {
+                p.score -= 1;
+            }
             p.guess = null;
         });
-        room.currentRound++;
+
         room.roundWinner = winner.username;
-        room.roundAverage = target;
+        room.roundAverage = target.toFixed(2);
+        room.currentRound++;
+
         await room.save();
-        io.to(roomCode).emit("round_result", { winner: winner.username, average: target });
+
+        io.to(roomCode).emit("round_result", {
+            winner: winner.username,
+            average: target.toFixed(2)
+        });
     }
+
     return res.status(200).json({ message: "Guess submitted successfully" });
+
+
 })
 
 //next level with null round winner and round average
-app.post("/api/room/nullmaker", async (req, res) =>{
+app.post("/api/room/nullmaker", async (req, res) => {
     const { roomCode } = req.body;
     let room = await Room.findOne({ roomCode });
     if (!room) return res.status(400).json({ message: "Room not found" });
@@ -140,7 +204,7 @@ app.post("/api/room/nullmaker", async (req, res) =>{
 //     await Room.deleteOne({ roomCode });
 //     res.json({ message: "Game ended" });
 // });
-
+//
 // WebSocket logic
 io.on("connection", (socket) => {
     //console.log('A user connected');
@@ -153,48 +217,14 @@ io.on("connection", (socket) => {
         io.emit('receiverd_player', data)
     })
 
-    socket.on('start_game', (data) => {
-        io.emit('received_start_game', data)
+    socket.on('start_game', (roomCode) => {
+        //io.emit('received_start_game', data)
+        io.to(roomCode).emit('received_start_game', roomCode);
     })
 
-    // socket.on("submit-guess", async ({ roomCode, username, guess }) => {
-    //     let room = await Room.findOne({ roomCode });
-    //     if (!room) return;
-    //     let player = room.players.find((p) => p.username === username);
-    //     if (player) {
-    //         player.guess = guess;
-    //         await room.save();
-    //     }
 
-    //     if (room.players.every((p) => p.guess !== null)) {
-    //         let avg =
-    //             room.players.reduce((sum, p) => sum + p.guess, 0) /
-    //             room.players.length;
-    //         let target = avg * 0.8;
-    //         let winner = room.players.reduce((prev, curr) =>
-    //             Math.abs(curr.guess - target) < Math.abs(prev.guess - target) ? curr : prev
-    //         );
-    //         winner.score += 1;
-    //         room.players.forEach((p) => {
-    //             if (p.username !== winner.username) p.score -= 1;
-    //             p.guess = null;
-    //         });
-    //         room.currentRound++;
-    //         await room.save();
-    //         io.to(roomCode).emit("round-result", { winner: winner.username, scores: room.players });
-    //     }
-
-    //     if (room.currentRound > 5) {
-    //         let finalWinner = room.players.reduce((prev, curr) => (curr.score > prev.score ? curr : prev));
-    //         io.to(roomCode).emit("game-over", { winner: finalWinner.username });
-    //         await Room.deleteOne({ roomCode });
-    //     }
-    // });
-
-    socket.on("next-round", async ({ roomCode }) => {
-        let room = await Room.findOne({ roomCode });
-        if (!room) return;
-        io.to(roomCode).emit("next-round-started", {});
+    socket.on('next-round', (roomCode) => {
+        io.to(roomCode).emit('next-round-started', roomCode);
     });
 });
 

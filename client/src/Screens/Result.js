@@ -9,19 +9,12 @@ const Result = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [winner, setWinner] = useState("");
-  const [average, setAverage] = useState();
+  const [average, setAverage] = useState(0);
   const user = JSON.parse(localStorage.getItem("user"));
   const [roomInfo, setRoomInfo] = useState();
   const [players, setPlayers] = useState([]);
 
-  useEffect(() => {
-    if (roomCode) {
-      socket.emit("join_room", roomCode);
-      console.log(`Joining room: ${roomCode}`);
-    }
-  }, [roomCode]);
-
-
+  //const mainAverage = average.toFixed(2);
 
   const fetchRoomInfo = async () => {
     const roomInfo = await axios.get(`http://localhost:2000/api/room/info/${roomCode}`)
@@ -44,8 +37,8 @@ const Result = () => {
   useEffect(() => {
     const timeout = setTimeout(() => {
       socket.on("round_result", (result) => {
-        console.log("Round result received:", result);
-        console.log("I am called");
+        //console.log("Round result received:", result);
+        //console.log("I am called");
         //setWinner(result.winner);
         //setAverage(result.average);
         fetchRoomInfo();
@@ -58,7 +51,7 @@ const Result = () => {
   }, []);
 
   useEffect(() => {
-    socket.on('received_start_game', (data) => {
+    socket.on('next-round-started', (data) => {
       console.log(data, "room started game")
       navigate(`/game/${roomCode}`);
     })
@@ -67,7 +60,7 @@ const Result = () => {
   const startNextLevel = async () => {
     try {
       await axios.post("http://localhost:2000/api/room/nullmaker", { roomCode });
-      socket.emit("start_game", roomCode);
+      socket.emit('next-round', roomCode);
       navigate(`/game/${roomCode}`);
       //setWinner("");
       //setAverage(null);
@@ -79,10 +72,11 @@ const Result = () => {
 
   return (
     <div>
-      <h1>Round {roomInfo?.currentRound - 1} result.</h1>
       {!winner && !average ? <div>
+        <h1>Round {roomInfo?.currentRound} result.</h1>
         <h2>Wait for other players</h2>
       </div> : <div>
+        <h1>Round {roomInfo?.currentRound - 1} result.</h1>
         <h2>Winner: {winner}</h2>
         <h2>Round Average: {average}</h2>
         <h3>Players:</h3>
@@ -93,7 +87,7 @@ const Result = () => {
         </ul>
       </div>}
 
-      {(user?.username === roomInfo?.host) && (players.length > 2) && (
+      {(user?.username === roomInfo?.host) && (players.length > 1) && (
         <button onClick={startNextLevel}>Play Next Round</button>
       )}
 

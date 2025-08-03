@@ -47,11 +47,12 @@ const Lobby = () => {
     // return () => {
     //   socket.off("player-joined");
     // };
+    // 
   }, []);
   console.log(user?.username)
   console.log(roomInfo)
   console.log(roomInfo?.host)
-  // Start the game by emitting the 'start-game' event
+  // Start the game by emitting the 'st  art-game' event
 
 
   useEffect(() => {
@@ -86,7 +87,7 @@ const Lobby = () => {
     <div>
       <h1>Lobby - Room Code: {roomCode}</h1>
       <h2>Welcome, {user?.username}</h2>
-      {(user?.username === roomInfo?.host) && (players.length > 2) && (
+      {(user?.username === roomInfo?.host) && (players.length > 1) && (
         <button onClick={startGame}>Start Game</button>
       )}
 

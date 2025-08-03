@@ -1,5 +1,5 @@
 // src/Home.js
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import socket from '../socket.js'
@@ -10,6 +10,10 @@ const Home = () => {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [username, setUsername] = useState("");
   const [roomCode, setRoomCode] = useState("");
+
+  // const user = JSON.parse(localStorage.getItem("user"));
+  // console.log(user)
+
 
   // Create room function
   const handleCreateRoom = async () => {
@@ -36,7 +40,7 @@ const Home = () => {
         await axios.post("http://localhost:2000/api/room/join", { roomCode, username });
         const user = { username: username, roomCode: roomCode };
         localStorage.setItem("user", JSON.stringify(user));
-        socket.emit('player_joined', {username}); // Emit event to server
+        socket.emit('player_joined', { username }); // Emit event to server
         navigate(`/lobby/${roomCode}`);
       } catch (error) {
         console.error("Error joining room", error);
